@@ -1,0 +1,54 @@
+# faicam settings (cameras.yaml): every option, with its default where it has one.
+# Usually you don't write this by hand: run `faicam` and add cameras on the
+# web page at http://localhost:7380, which writes cameras.yaml for you.
+
+cameras:
+  # The name is what programs subscribe to: faistream.subscribe("door")
+  door:
+    ip: 192.168.1.21
+    username: admin
+    password: my-p@ssword        # special characters need no escaping
+    brand: hikvision             # hikvision, dahua, hanwha (wisenet), axis, reolink, uniview,
+                                 # tapo, foscam, or `other` together with `path`
+    backup: yard                 # optional: another camera's name, a source, or a list
+    rtsp_transport: auto         # optional: auto (TCP first) | tcp | udp
+    fps: 15                      # optional: cap the frame rate
+    size: 1280x720               # optional: resize (WIDTHxHEIGHT)
+    open_timeout: 5              # optional: seconds to wait when connecting
+    read_timeout: 5              # optional: seconds without a frame before reconnecting
+    paused: false                # optional: true stops streaming until resumed (the page's Pause)
+
+  yard:
+    ip: 192.168.1.22
+    username: admin
+    password: ${YARD_PASS}       # read from the environment, if you prefer
+    brand: other                 # a camera whose brand isn't listed:
+    path: /live/main             #   the part of its stream address after the IP
+    port: 554                    #   and its RTSP port
+
+  # Anything that isn't an IP camera: an RTSP URL, a video file (plays at its native
+  # speed and loops), a USB camera number, a GStreamer pipeline, or a test pattern.
+  replay:
+    source: ./recordings/lobby.mp4
+  test-pattern:
+    source: synthetic://640x480@15
+
+# Optional: the web server. `ui: false` turns it off. Camera links only show video, so they
+# can be shared with phones and TVs while the page that changes cameras stays local.
+ui:
+  port: 7380                     # the page and the camera links
+  links: local                   # local | network: who can open /live and /snapshot links
+  # links_password: choose-one   # optional: other devices must enter it to watch
+  page: local                    # local | network: who can open the page itself
+  # password: choose-another     # needed when page is network; it also opens every link
+  bind: 0.0.0.0                  # interface used when the links or the page are shared
+
+# Optional: also share frames with other machines over TCP. `network: true` uses these.
+network:
+  codec: jpeg                    # jpeg | raw | zstd
+  quality: 85                    # JPEG quality, 1-100
+  level: 3                       # zstd level: 3 is the sweet spot, higher costs much more CPU
+  bind: 0.0.0.0                  # interface for the network and control ports
+
+port: 7300                       # control port; network streams use the next free ports
+slots: 4                         # frames kept in shared memory per stream

@@ -1,0 +1,50 @@
+[project]
+name = "faicam"
+version = "0.1.0"
+description = "Manage cameras from a web page, on top of faistream: add and test cameras, watch them from any device, and see who is watching."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+keywords = ["cameras", "cctv", "rtsp", "streaming", "web"]
+dependencies = [
+    "faistream[opencv]",
+    "numpy>=1.23",
+    "pydantic>=2.5",
+    "pyyaml>=6",
+]
+
+[project.optional-dependencies]
+zstd = ["faistream[zstd]"]
+
+[project.scripts]
+faicam = "faicam.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.10", "types-PyYAML"]
+
+# While both projects live side by side, use the local faistream.
+[tool.uv.sources]
+faistream = { path = "../faivision", editable = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+extend-exclude = ["frontend"]
+
+[tool.ruff.format]
+exclude = ["*.md"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+
+[tool.mypy]
+strict = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

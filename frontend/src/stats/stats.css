@@ -1,0 +1,58 @@
+/* The stats page: tiles, tables and charts. */
+
+/* tiles */
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px 12px; box-shadow: var(--shadow);
+        display: grid; gap: 2px; align-content: start; min-width: 0; }
+.tile .label { color: var(--muted); font-size: 13px; font-weight: 600; }
+.tile .value { font-size: 26px; font-weight: 700; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+.tile .sub { color: var(--muted); font-size: 13px; }
+.tile svg { display: block; width: 100%; height: 34px; margin-top: 8px; overflow: visible; }
+
+/* panels and tables */
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow);
+         padding: 16px 18px 18px; display: grid; gap: 12px; min-width: 0; }
+.panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; }
+.panel h2 { margin: 0; font-size: 17px; }
+.panel-head p, .explain { margin: 0; color: var(--muted); font-size: 13px; }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; font-variant-numeric: tabular-nums; }
+th { text-align: left; font-size: 12px; font-weight: 600; color: var(--muted); padding: 6px 10px; border-bottom: 1px solid var(--line);
+     vertical-align: bottom; line-height: 1.3; }
+th.num { white-space: normal; min-width: 64px; }
+td { padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tbody tr:last-child td { border-bottom: 0; }
+th:first-child, td:first-child { padding-left: 0; }
+.num { text-align: right; white-space: nowrap; }
+.name { font-weight: 600; white-space: nowrap; }
+.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 8px; flex: none; }
+td small { display: block; color: var(--muted); font-size: 12px; font-weight: 400; }
+td small.problem { font-family: var(--mono); word-break: break-word; max-width: 38ch; }
+td.empty { color: var(--muted); padding: 8px 0; }
+.muted { color: var(--muted); }
+
+/* charts */
+.charts { display: grid; gap: 26px; }
+.chart { display: grid; gap: 8px; min-width: 0; }
+.chart h3 { margin: 0; font-size: 15px; }
+.chart h3 span { color: var(--muted); font-weight: 400; font-size: 13px; margin-left: 6px; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; padding: 0; list-style: none; font-size: 13px; color: var(--muted); }
+.legend li { display: inline-flex; align-items: center; }
+.plot { position: relative; }
+.plot svg { display: block; width: 100%; height: 210px; overflow: visible; touch-action: pan-y; }
+.plot text { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.plot text.end { fill: var(--ink); font-size: 12px; font-weight: 600; }
+.plot text.nodata { font-size: 13px; }
+.tip { position: absolute; top: 0; pointer-events: none; background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+       box-shadow: 0 4px 16px rgba(0, 0, 0, .14); padding: 8px 10px; font-size: 13px; min-width: 150px; z-index: 2; }
+.tip b { display: block; font-size: 12px; color: var(--muted); font-weight: 600; margin-bottom: 4px; }
+.tip div { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+.tip div span:nth-child(2) { flex: 1; padding-right: 12px; }
+.tip div span:last-child { font-weight: 600; font-variant-numeric: tabular-nums; }
+.chart details summary { font-size: 13px; }
+.chart details[open] summary { margin-bottom: 8px; }
+
+#health td { padding-left: 8px; padding-right: 8px; }
+#health td:first-child { padding-left: 0; }
+
+@media (max-width: 520px) { .tile .value { font-size: 22px; } .panel { padding: 14px 14px 16px; } }
