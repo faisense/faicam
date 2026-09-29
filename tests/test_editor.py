@@ -10,9 +10,14 @@ from faistream import Service
 
 from faicam.config import ConfigFile, UIConfig
 from faicam.editor import MASK, EditError, Editor, _mask, _unmask, links_url, page_url
-from tests.helpers import free_port_block
+from tests.helpers import free_port_block, stream_port
 
 SYNTHETIC = {"kind": "source", "source": "synthetic://64x48@30"}
+
+
+def synthetic() -> dict[str, object]:
+    """A new synthetic camera's form fields, with a port of its own."""
+    return {**SYNTHETIC, "stream_port": stream_port()}
 
 
 class Restarts:
@@ -46,13 +51,13 @@ def test_backups_in_order(setup: tuple[Editor, ConfigFile, Restarts], tmp_path: 
     editor, file, _ = setup
     video = tmp_path / "backup.mp4"
     video.write_bytes(b"")
-    editor.save_camera({"name": "a", **SYNTHETIC})
+    editor.save_camera({"name": "a", **synthetic()})
     backups = [
         {"type": "camera", "value": "a"},
         {"type": "address", "value": str(video)},
         {"type": "address", "value": ""},  # empty rows are ignored
     ]
-    editor.save_camera({"name": "b", **SYNTHETIC, "backups": backups})
+    editor.save_camera({"name": "b", **synthetic(), "backups": backups})
     assert saved(file)["cameras"]["b"]["backup"] == ["a", str(video)]
     assert editor.camera_settings("b")["backups"] == backups[:2]
 
@@ -70,14 +75,14 @@ def test_backup_errors(
 ) -> None:
     editor, _, _ = setup
     with pytest.raises(EditError, match=message):
-        editor.save_camera({"name": "b", **SYNTHETIC, "backups": [backup]})
+        editor.save_camera({"name": "b", **synthetic(), "backups": [backup]})
 
 
 def test_backup_address_keeps_its_password(setup: tuple[Editor, ConfigFile, Restarts]) -> None:
     editor, file, _ = setup
     secret = "rtsp://u:s3cret@127.0.0.1:1/backup"
     editor.save_camera(
-        {"name": "a", **SYNTHETIC, "backups": [{"type": "address", "value": secret}]}
+        {"name": "a", **synthetic(), "backups": [{"type": "address", "value": secret}]}
     )
     shown = editor.camera_settings("a")["backups"]
     assert shown == [{"type": "address", "value": "rtsp://127.0.0.1:1/backup"}]
@@ -87,18 +92,18 @@ def test_backup_address_keeps_its_password(setup: tuple[Editor, ConfigFile, Rest
 
 def test_timeouts(setup: tuple[Editor, ConfigFile, Restarts]) -> None:
     editor, file, _ = setup
-    editor.save_camera({"name": "a", **SYNTHETIC, "open_timeout": "2.5", "read_timeout": "5"})
+    editor.save_camera({"name": "a", **synthetic(), "open_timeout": "2.5", "read_timeout": "5"})
     entry = saved(file)["cameras"]["a"]
     assert entry["open_timeout"] == 2.5 and "read_timeout" not in entry  # defaults aren't written
     settings = editor.camera_settings("a")
     assert (settings["open_timeout"], settings["read_timeout"]) == (2.5, 5.0)
     with pytest.raises(EditError, match="Connect timeout must be a number"):
-        editor.save_camera({"name": "b", **SYNTHETIC, "open_timeout": "soon"})
+        editor.save_camera({"name": "b", **synthetic(), "open_timeout": "soon"})
 
 
 def test_camera_changes_apply_without_restart(setup: tuple[Editor, ConfigFile, Restarts]) -> None:
     editor, _, restarts = setup
-    assert editor.save_camera({"name": "a", **SYNTHETIC}) == {"ok": True, "restart": False}
+    assert editor.save_camera({"name": "a", **synthetic()}) == {"ok": True, "restart": False}
     assert "a" in editor.service.config.streams and restarts.count == 0
 
 
@@ -182,7 +187,7 @@ def test_default_settings_are_not_written(setup: tuple[Editor, ConfigFile, Resta
 
 def test_yaml_editor_round_trip(setup: tuple[Editor, ConfigFile, Restarts]) -> None:
     editor, file, restarts = setup
-    editor.save_camera({"name": "a", **SYNTHETIC})
+    editor.save_camera({"name": "a", **synthetic()})
     text = editor.yaml_text()
     assert "cameras:" in text
     result = editor.save_yaml(text.replace("synthetic://64x48@30", "synthetic://32x16@30"))
@@ -224,6 +229,7 @@ def test_yaml_editor_never_shows_passwords(setup: tuple[Editor, ConfigFile, Rest
     editor.save_camera(
         {
             "name": "cam",
+            "stream_port": stream_port(),
             "kind": "camera",
             "ip": "127.0.0.1",
             "port": 1,
@@ -234,6 +240,7 @@ def test_yaml_editor_never_shows_passwords(setup: tuple[Editor, ConfigFile, Rest
     editor.save_camera(
         {
             "name": "url",
+            "stream_port": stream_port(),
             "kind": "rtsp",
             "source": "rtsp://127.0.0.1:1/x",
             "username": "u",
@@ -290,7 +297,7 @@ def test_without_restart_support_saves_and_says_so(
 
 def test_pause_and_resume(setup: tuple[Editor, ConfigFile, Restarts]) -> None:
     editor, file, restarts = setup
-    editor.save_camera({"name": "a", **SYNTHETIC})
+    editor.save_camera({"name": "a", **synthetic()})
     assert editor.set_paused("a", True) == {"ok": True, "restart": False}  # applied live
     assert saved(file)["cameras"]["a"]["paused"] is True
     assert editor.service.config.streams["a"].paused and editor.camera_settings("a")["paused"]

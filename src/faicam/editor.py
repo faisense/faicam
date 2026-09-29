@@ -52,7 +52,7 @@ log = logging.getLogger(__name__)
 
 MASK = "********"
 _FORM_FIELDS = (
-    "ip", "port", "username", "password", "brand", "path", "source", "backup",
+    "ip", "port", "username", "password", "brand", "path", "source", "stream_port", "backup",
     "fps", "size", "rtsp_transport", "open_timeout", "read_timeout",
 )  # fmt: skip
 _DEFAULT_TIMEOUT = 5.0
@@ -126,6 +126,7 @@ class Editor:
             has_password = bool(password)
         return {
             "kind": kind,
+            "stream_port": cfg.stream_port,
             "ip": cfg.ip or "",
             "port": cfg.port,
             "username": username,
@@ -241,6 +242,10 @@ class Editor:
             entry["source"] = self._url_field(data)
         else:
             entry["source"] = self._source_field(data)
+        # Set by hand, one per camera; a form that doesn't send it keeps the current one.
+        stream_port = data.get("stream_port") or existing.get("stream_port")
+        if stream_port not in (None, ""):
+            entry["stream_port"] = int(_number(stream_port, "Stream port"))
 
         backups = self._backups_field(data, name, original, existing.get("backup"))
         if backups:
@@ -532,10 +537,8 @@ def _friendly(message: str) -> str:
     """Config errors, reworded for the page. Each keeps where it is, e.g. ``cameras.door.fps``."""
     message = message.removeprefix("invalid configuration:\n").strip()
     replacements = {
-        "String should match pattern '^[A-Za-z0-9][A-Za-z0-9_.-]{0,62}$'": (
-            "use letters, numbers, dots, dashes or underscores, starting with a letter or number"
-        ),
         "Extra inputs are not permitted": "unknown setting (check the spelling)",
+        "Field required": "missing: this setting is required",
     }
     for technical, plain in replacements.items():
         message = message.replace(technical, plain)

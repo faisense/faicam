@@ -15,7 +15,7 @@ from faistream.streaming.sources import split_credentials
 
 from faicam.config import ConfigFile, UIConfig
 from faicam.server import WebUI
-from tests.helpers import free_port_block
+from tests.helpers import free_port_block, stream_port
 
 pytest.importorskip("cv2")  # the page's pictures are JPEG
 
@@ -85,6 +85,11 @@ def app(tmp_path: Path) -> Iterator[tuple[Client, ConfigFile]]:
 SYNTHETIC = {"kind": "source", "source": "synthetic://64x48@30"}
 
 
+def synthetic() -> dict[str, object]:
+    """A new synthetic camera's form fields, with a port of its own."""
+    return {**SYNTHETIC, "stream_port": stream_port()}
+
+
 def test_page_and_empty_state(app: tuple[Client, ConfigFile]) -> None:
     client, _ = app
     status, html, head = client.call("GET", "/")
@@ -99,7 +104,8 @@ def test_page_and_empty_state(app: tuple[Client, ConfigFile]) -> None:
 
 def test_add_edit_and_remove(app: tuple[Client, ConfigFile]) -> None:
     client, file = app
-    assert client.call("POST", "/api/cameras", {"name": "cam", **SYNTHETIC})[0] == 200
+    added = {"name": "cam", **synthetic()}
+    assert client.call("POST", "/api/cameras", added)[0] == 200
     cam = client.wait_streaming("cam")
     assert (cam["width"], cam["height"]) == (64, 48)
     assert file.path.exists() and stat.S_IMODE(os.stat(file.path).st_mode) == 0o600
@@ -112,8 +118,8 @@ def test_add_edit_and_remove(app: tuple[Client, ConfigFile]) -> None:
     assert client.call("POST", "/api/cameras", body)[0] == 200
     client.wait_streaming("lobby")
     assert [c["name"] for c in client.state()["cameras"]] == ["lobby"]
-    assert ConfigFile.open(file.path).cameras() == {
-        "lobby": {"source": "synthetic://64x48@30", "fps": 10}
+    assert ConfigFile.open(file.path).cameras() == {  # the edit didn't send a port: kept
+        "lobby": {"source": "synthetic://64x48@30", "stream_port": added["stream_port"], "fps": 10}
     }
 
     assert client.call("DELETE", "/api/cameras/lobby")[0] == 200
@@ -123,9 +129,9 @@ def test_add_edit_and_remove(app: tuple[Client, ConfigFile]) -> None:
 
 def test_backup_by_name(app: tuple[Client, ConfigFile]) -> None:
     client, file = app
-    client.call("POST", "/api/cameras", {"name": "a", **SYNTHETIC})
+    client.call("POST", "/api/cameras", {"name": "a", **synthetic()})
     backups = [{"type": "camera", "value": "a"}]
-    client.call("POST", "/api/cameras", {"name": "b", **SYNTHETIC, "backups": backups})
+    client.call("POST", "/api/cameras", {"name": "b", **synthetic(), "backups": backups})
     assert ConfigFile.open(file.path).cameras()["b"]["backup"] == "a"
     assert client.state()["cameras"][1]["settings"]["backups"] == backups
 
@@ -133,11 +139,21 @@ def test_backup_by_name(app: tuple[Client, ConfigFile]) -> None:
 @pytest.mark.parametrize(
     ("body", "status", "message"),
     [
-        ({"name": "bad name", **SYNTHETIC}, 400, "letters, numbers"),
-        ({"name": "cam", "kind": "camera"}, 400, "IP address"),
-        ({"name": "cam", "kind": "camera", "ip": "10.0.0.5", "brand": "other"}, 400, "path"),
-        ({"name": "cam", "kind": "source"}, 400, "Enter the source"),
-        ({"name": "cam", **SYNTHETIC, "fps": "fast"}, 400, "must be a number"),
+        ({"name": "bad name", **synthetic()}, 400, "lowercase letters, digits"),
+        ({"name": "cam", "stream_port": stream_port(), "kind": "camera"}, 400, "IP address"),
+        (
+            {
+                "name": "cam",
+                "stream_port": stream_port(),
+                "kind": "camera",
+                "ip": "10.0.0.5",
+                "brand": "other",
+            },
+            400,
+            "path",
+        ),
+        ({"name": "cam", "stream_port": stream_port(), "kind": "source"}, 400, "Enter the source"),
+        ({"name": "cam", **synthetic(), "fps": "fast"}, 400, "must be a number"),
     ],
 )
 def test_form_errors_are_readable(
@@ -150,14 +166,21 @@ def test_form_errors_are_readable(
 
 def test_duplicate_name(app: tuple[Client, ConfigFile]) -> None:
     client, _ = app
-    client.call("POST", "/api/cameras", {"name": "cam", **SYNTHETIC})
-    code, reply, _ = client.call("POST", "/api/cameras", {"name": "cam", **SYNTHETIC})
+    client.call("POST", "/api/cameras", {"name": "cam", **synthetic()})
+    code, reply, _ = client.call("POST", "/api/cameras", {"name": "cam", **synthetic()})
     assert code == 400 and "already exists" in reply["error"]
 
 
 def test_unreachable_camera_is_explained_and_not_saved(app: tuple[Client, ConfigFile]) -> None:
     client, file = app
-    camera = {"name": "cam", "kind": "camera", "ip": "127.0.0.1", "port": 1, "brand": "auto"}
+    camera = {
+        "name": "cam",
+        "stream_port": stream_port(),
+        "kind": "camera",
+        "ip": "127.0.0.1",
+        "port": 1,
+        "brand": "auto",
+    }
     code, reply, _ = client.call("POST", "/api/detect", camera)
     assert code == 422 and "Can't reach 127.0.0.1 on port 1" in reply["error"]
     code, reply, _ = client.call("POST", "/api/cameras", camera)
@@ -168,6 +191,7 @@ def test_passwords_never_reach_the_page(app: tuple[Client, ConfigFile]) -> None:
     client, file = app
     camera = {
         "name": "cam",
+        "stream_port": stream_port(),
         "kind": "camera",
         "ip": "127.0.0.1",
         "port": 1,
@@ -179,7 +203,12 @@ def test_passwords_never_reach_the_page(app: tuple[Client, ConfigFile]) -> None:
     client.call(
         "POST",
         "/api/cameras",
-        {"name": "src", "kind": "source", "source": "rtsp://u:s3cret!@127.0.0.1:1/x"},
+        {
+            "name": "src",
+            "stream_port": stream_port(),
+            "kind": "source",
+            "source": "rtsp://u:s3cret!@127.0.0.1:1/x",
+        },
     )
     state = client.state()
     assert "s3cret" not in json.dumps(state)
@@ -203,7 +232,7 @@ def test_passwords_never_reach_the_page(app: tuple[Client, ConfigFile]) -> None:
 
 def test_live_video(app: tuple[Client, ConfigFile]) -> None:
     client, _ = app
-    client.call("POST", "/api/cameras", {"name": "cam", **SYNTHETIC})
+    client.call("POST", "/api/cameras", {"name": "cam", **synthetic()})
     client.wait_streaming("cam")
     with urllib.request.urlopen(client.base + "/live/cam.mjpg", timeout=10) as response:
         assert response.headers["Content-Type"].startswith("multipart/x-mixed-replace")
@@ -215,7 +244,7 @@ def test_rejects_other_sites(app: tuple[Client, ConfigFile]) -> None:
     client, _ = app
     port = client.base.rsplit(":", 1)[1]
     assert client.call("GET", "/api/state", headers={"Host": f"evil.example:{port}"})[0] == 403
-    body = {"name": "cam", **SYNTHETIC}
+    body = {"name": "cam", **synthetic()}
     assert client.call("POST", "/api/cameras", body, {"Origin": "http://evil.example"})[0] == 403
     request = urllib.request.Request(client.base + "/api/cameras", data=b"{}", method="POST")
     request.add_header("Content-Type", "text/plain")
@@ -242,7 +271,7 @@ def test_read_only_without_config_file(tmp_path: Path) -> None:
     try:
         client = Client(page.ui.port)
         assert client.state()["editable"] is False
-        code, reply, _ = client.call("POST", "/api/cameras", {"name": "cam", **SYNTHETIC})
+        code, reply, _ = client.call("POST", "/api/cameras", {"name": "cam", **synthetic()})
         assert code == 409 and "config file" in reply["error"]
     finally:
         page.stop()
@@ -251,11 +280,11 @@ def test_read_only_without_config_file(tmp_path: Path) -> None:
 
 def test_read_only_config_file_is_explained(app: tuple[Client, ConfigFile], tmp_path: Path) -> None:
     client, file = app
-    client.call("POST", "/api/cameras", {"name": "cam", **SYNTHETIC})
+    client.call("POST", "/api/cameras", {"name": "cam", **synthetic()})
     os.chmod(file.path, 0o400)
     os.chmod(tmp_path, 0o500)  # can't write the file or replace it
     try:
-        code, reply, _ = client.call("POST", "/api/cameras", {"name": "two", **SYNTHETIC})
+        code, reply, _ = client.call("POST", "/api/cameras", {"name": "two", **synthetic()})
     finally:
         os.chmod(tmp_path, 0o700)
     assert code == 500 and "Could not save" in reply["error"]
@@ -264,7 +293,12 @@ def test_read_only_config_file_is_explained(app: tuple[Client, ConfigFile], tmp_
 
 def test_missing_file_is_reported_before_saving(app: tuple[Client, ConfigFile]) -> None:
     client, file = app
-    body = {"name": "public", "kind": "source", "source": "~/Movies/no-such-video.mp4"}
+    body = {
+        "name": "public",
+        "stream_port": stream_port(),
+        "kind": "source",
+        "source": "~/Movies/no-such-video.mp4",
+    }
     code, reply, _ = client.call("POST", "/api/cameras", body)
     assert code == 400 and "There's no file at" in reply["error"]
     assert "~" not in reply["error"]  # shows the full path it looked in
@@ -284,6 +318,7 @@ def test_rtsp_address_with_separate_login(app: tuple[Client, ConfigFile]) -> Non
     client, file = app
     body = {
         "name": "cloud",
+        "stream_port": stream_port(),
         "kind": "rtsp",
         "source": "rtsp://127.0.0.1:1/app/stream",
         "username": "me@example.com",
@@ -303,7 +338,9 @@ def test_rtsp_address_with_separate_login(app: tuple[Client, ConfigFile]) -> Non
 def test_rtsp_address_errors(app: tuple[Client, ConfigFile], source: str, message: str) -> None:
     client, _ = app
     code, reply, _ = client.call(
-        "POST", "/api/cameras", {"name": "x", "kind": "rtsp", "source": source}
+        "POST",
+        "/api/cameras",
+        {"name": "x", "stream_port": stream_port(), "kind": "rtsp", "source": source},
     )
     assert code == 400 and message in reply["error"]
 
@@ -320,10 +357,15 @@ def test_live_link_works_in_opencv(app: tuple[Client, ConfigFile]) -> None:
     import cv2
 
     client, _ = app
-    body = {"name": "cam.1", "kind": "source", "source": "synthetic://128x96@30"}  # dots work
+    body = {
+        "name": "cam-1",
+        "stream_port": stream_port(),
+        "kind": "source",
+        "source": "synthetic://128x96@30",
+    }
     client.call("POST", "/api/cameras", body)
-    client.wait_streaming("cam.1")
-    capture = cv2.VideoCapture(client.base + "/live/cam.1.mjpg?fps=30&width=64")
+    client.wait_streaming("cam-1")
+    capture = cv2.VideoCapture(client.base + "/live/cam-1.mjpg?fps=30&width=64")
     try:
         ok, image = capture.read()
     finally:
@@ -352,7 +394,7 @@ def test_live_viewers_share_one_encode(
     import threading
 
     client, _ = app
-    client.call("POST", "/api/cameras", {"name": "cam", **SYNTHETIC})
+    client.call("POST", "/api/cameras", {"name": "cam", **synthetic()})
     client.wait_streaming("cam")
     encodes: list[int] = []
     original = WebUI._jpeg
@@ -394,7 +436,7 @@ def test_live_link_with_password_in_the_address(
     service, page, _ = start(tmp_path, ui)
     try:
         client = Client(page.ui.port)
-        client.call("POST", "/api/cameras", {"name": "cam", **SYNTHETIC})
+        client.call("POST", "/api/cameras", {"name": "cam", **synthetic()})
         client.wait_streaming("cam")
         monkeypatch.setattr(access, "is_loopback", lambda address: False)  # as if from elsewhere
         base = f"http://127.0.0.1:{page.ui.port}/live/cam.mjpg"
@@ -412,7 +454,7 @@ def test_live_link_with_password_in_the_address(
 def test_browsers_get_a_viewer_page(app: tuple[Client, ConfigFile]) -> None:
     """Browsers opening the link get a page (Safari never finishes a bare MJPEG); apps get video."""
     client, _ = app
-    client.call("POST", "/api/cameras", {"name": "cam", **SYNTHETIC})
+    client.call("POST", "/api/cameras", {"name": "cam", **synthetic()})
     client.wait_streaming("cam")
     browser = {"Accept": "text/html,application/xhtml+xml,*/*;q=0.8"}
     code, html, head = client.call("GET", "/live/cam.mjpg?fps=30", headers=browser)
@@ -458,7 +500,7 @@ def test_paused_viewers_end_their_stream(app: tuple[Client, ConfigFile]) -> None
     import threading
 
     client, _ = app
-    client.call("POST", "/api/cameras", {"name": "cam", **SYNTHETIC})
+    client.call("POST", "/api/cameras", {"name": "cam", **synthetic()})
     client.wait_streaming("cam")
     ended = threading.Event()
 
@@ -483,7 +525,7 @@ def test_pause_camera_from_the_control_panel(app: tuple[Client, ConfigFile]) -> 
     import threading
 
     client, _ = app
-    client.call("POST", "/api/cameras", {"name": "cam", **SYNTHETIC})
+    client.call("POST", "/api/cameras", {"name": "cam", **synthetic()})
     client.wait_streaming("cam")
     ended = threading.Event()
 
@@ -516,7 +558,7 @@ def test_stats_page(tmp_path: Path) -> None:
         status, html, _ = client.call("GET", "/stats")
         assert status == 200 and b"/assets/stats-" in html
 
-        client.call("POST", "/api/cameras", {"name": "cam", **SYNTHETIC})
+        client.call("POST", "/api/cameras", {"name": "cam", **synthetic()})
         client.wait_streaming("cam")
         vlc = urllib.request.Request(
             client.base + "/live/cam.mjpg", headers={"User-Agent": "VLC/3.0.21 LibVLC/3.0.21"}
@@ -574,7 +616,7 @@ def test_viewers_on_other_devices(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     service, page, _ = start(tmp_path, ui)
     client = Client(page.ui.port)
     try:
-        client.call("POST", "/api/cameras", {"name": "cam", **SYNTHETIC})
+        client.call("POST", "/api/cameras", {"name": "cam", **synthetic()})
         client.wait_streaming("cam")
         monkeypatch.setattr(access, "is_loopback", lambda address: False)  # as if from a phone
 
@@ -613,7 +655,7 @@ def test_camera_links_with_a_password(tmp_path: Path, monkeypatch: pytest.Monkey
     service, page, _ = start(tmp_path, ui)
     admin = Client(page.ui.port, password="admin")
     try:
-        admin.call("POST", "/api/cameras", {"name": "cam", **SYNTHETIC})
+        admin.call("POST", "/api/cameras", {"name": "cam", **synthetic()})
         admin.wait_streaming("cam")
         monkeypatch.setattr(access, "is_loopback", lambda address: False)
 

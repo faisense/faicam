@@ -29,6 +29,7 @@ interface Fields {
   size: string;
   transport: "auto" | "tcp" | "udp";
   port: string;
+  streamPort: string;
   openTimeout: string;
   readTimeout: string;
 }
@@ -76,6 +77,7 @@ export function CameraDrawer({ camera, cameras, brands, onClose, onSaved, onOpen
     return {
       name: fields.name.trim(),
       original: camera?.name ?? null,
+      stream_port: fields.streamPort.trim(),
       kind,
       ip: fields.ip.trim(),
       port: fields.port || DEFAULT_PORT,
@@ -118,6 +120,10 @@ export function CameraDrawer({ camera, cameras, brands, onClose, onSaved, onOpen
       nameRef.current?.focus();
       return;
     }
+    if (!data.stream_port) {
+      setError("Give the camera a stream port, like 7301. Each camera needs its own.");
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -151,8 +157,13 @@ export function CameraDrawer({ camera, cameras, brands, onClose, onSaved, onOpen
       <div class="fields">
         <label>
           Name
-          <input ref={nameRef} value={fields.name} onInput={(e) => set("name", e.currentTarget.value)} placeholder="front-door" maxLength={63} />
-          <small>Programs use this name to watch the camera.</small>
+          <input ref={nameRef} value={fields.name} onInput={(e) => set("name", e.currentTarget.value)} placeholder="front-door" maxLength={32} />
+          <small>Programs use this name to watch the camera. Lowercase letters, digits, - and _, starting with a letter.</small>
+        </label>
+        <label>
+          Stream port
+          <input type="number" min={1} max={65435} value={fields.streamPort} onInput={(e) => set("streamPort", e.currentTarget.value)} placeholder="7301" />
+          <small>Other machines watch the camera on this port, programs on this computer on this port + 100. Each camera needs its own.</small>
         </label>
 
         <div class="seg" role="group" aria-label="Type">
@@ -415,6 +426,7 @@ function initialFields(camera: Camera | null): Fields {
     size: s?.size ?? "",
     transport: s?.rtsp_transport ?? "auto",
     port: differs(s?.port, DEFAULT_PORT),
+    streamPort: s?.stream_port ? String(s.stream_port) : "",
     openTimeout: differs(s?.open_timeout, DEFAULT_TIMEOUT),
     readTimeout: differs(s?.read_timeout, DEFAULT_TIMEOUT),
   };

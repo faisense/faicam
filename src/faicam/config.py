@@ -4,12 +4,14 @@ and the web page (``ui``).
     cameras:
       door:
         ip: 192.168.1.21
+        stream_port: 7301      # set by hand, one per camera (the page has a field for it)
         username: admin
         password: secret
         brand: hikvision       # faicam knows the stream address of common brands
-        backup: yard
+        backup: replay
       replay:
         source: ./recordings/lobby.mp4   # anything faistream reads: a file, RTSP URL, ...
+        stream_port: 7302
     ui:
       links: network           # phones and TVs can open camera links
 

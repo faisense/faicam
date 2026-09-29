@@ -240,8 +240,8 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "faistream", extras = ["opencv"], editable = "../faivision" },
-    { name = "faistream", extras = ["zstd"], marker = "extra == 'zstd'", editable = "../faivision" },
+    { name = "faistream", extras = ["opencv"], editable = "../faistream" },
+    { name = "faistream", extras = ["zstd"], marker = "extra == 'zstd'", editable = "../faistream" },
     { name = "numpy", specifier = ">=1.23" },
     { name = "pydantic", specifier = ">=2.5" },
     { name = "pyyaml", specifier = ">=6" },
@@ -259,7 +259,7 @@ dev = [
 [[package]]
 name = "faistream"
 version = "0.1.0"
-source = { editable = "../faivision" }
+source = { editable = "../faistream" }
 dependencies = [
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*'" },

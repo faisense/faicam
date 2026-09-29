@@ -24,7 +24,7 @@ dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.10", "types-PyYAML"]
 
 # While both projects live side by side, use the local faistream.
 [tool.uv.sources]
-faistream = { path = "../faivision", editable = true }
+faistream = { path = "../faistream", editable = true }
 
 [build-system]
 requires = ["hatchling"]

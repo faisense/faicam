@@ -55,12 +55,14 @@ shows the whole file. It's faistream's settings plus cameras by IP address and t
 cameras:
   door:
     ip: 192.168.1.21
+    stream_port: 7301          # one per camera; programs still just subscribe("door")
     username: admin
     password: ${DOOR_PASS}     # read from the environment
     brand: hikvision
-    backup: yard
+    backup: replay             # another camera: its frames are reused, not read again
   replay:
     source: ./recordings/lobby.mp4   # anything faistream reads
+    stream_port: 7302
 ui:
   links: network               # phones and TVs can open camera links
 ```

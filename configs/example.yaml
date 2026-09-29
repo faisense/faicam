@@ -3,14 +3,18 @@
 # web page at http://localhost:7380, which writes cameras.yaml for you.
 
 cameras:
-  # The name is what programs subscribe to: faistream.subscribe("door")
+  # The name is what programs subscribe to: faistream.subscribe("door"). Names use
+  # lowercase letters, digits, - and _, start with a letter, and are at most 32 characters.
   door:
     ip: 192.168.1.21
+    stream_port: 7301            # required, one per camera: other machines connect to 7301,
+                                 # programs on this computer to 7401 (stream_port + 100)
     username: admin
     password: my-p@ssword        # special characters need no escaping
     brand: hikvision             # hikvision, dahua, hanwha (wisenet), axis, reolink, uniview,
                                  # tapo, foscam, or `other` together with `path`
-    backup: yard                 # optional: another camera's name, a source, or a list
+    backup: yard                 # optional: another camera (reuses its frames: that camera
+                                 # is still read once), a source, or a list of them
     rtsp_transport: auto         # optional: auto (TCP first) | tcp | udp
     fps: 15                      # optional: cap the frame rate
     size: 1280x720               # optional: resize (WIDTHxHEIGHT)
@@ -20,18 +24,21 @@ cameras:
 
   yard:
     ip: 192.168.1.22
+    stream_port: 7302
     username: admin
     password: ${YARD_PASS}       # read from the environment, if you prefer
     brand: other                 # a camera whose brand isn't listed:
     path: /live/main             #   the part of its stream address after the IP
-    port: 554                    #   and its RTSP port
+    port: 554                    #   and its RTSP port (not the stream_port)
 
   # Anything that isn't an IP camera: an RTSP URL, a video file (plays at its native
   # speed and loops), a USB camera number, a GStreamer pipeline, or a test pattern.
   replay:
     source: ./recordings/lobby.mp4
+    stream_port: 7303
   test-pattern:
     source: synthetic://640x480@15
+    stream_port: 7304
 
 # Optional: the web server. `ui: false` turns it off. Camera links only show video, so they
 # can be shared with phones and TVs while the page that changes cameras stays local.
@@ -50,5 +57,5 @@ network:
   level: 3                       # zstd level: 3 is the sweet spot, higher costs much more CPU
   bind: 0.0.0.0                  # interface for the network and control ports
 
-port: 7300                       # control port; network streams use the next free ports
+port: 7300                       # control port: where programs find cameras by name
 slots: 4                         # frames kept in shared memory per stream

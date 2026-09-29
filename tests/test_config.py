@@ -12,19 +12,27 @@ def test_camera_fields_build_the_stream_address() -> None:
             "cameras": {
                 "door": {
                     "ip": "10.0.0.5",
+                    "stream_port": 7301,
                     "username": "admin",
                     "password": "p@ss",
                     "brand": "Wisenet",
                     "backup": "yard",
                 },
-                "yard": {"ip": "10.0.0.6", "brand": "other", "path": "/live", "port": 8554},
+                "yard": {
+                    "ip": "10.0.0.6",
+                    "stream_port": 7302,
+                    "brand": "other",
+                    "path": "/live",
+                    "port": 8554,  # the camera's RTSP port, not the stream's
+                },
             }
         }
     )
     door = config.streams["door"]
     assert door.brand == "hanwha"
     assert door.primary == "rtsp://admin:p%40ss@10.0.0.5:554/profile2/media.smp"
-    assert config.sources_for("door") == [door.primary, "rtsp://10.0.0.6:8554/live"]
+    assert door.sources == [door.primary, "yard"]  # faistream hands yard's frames over
+    assert config.streams["yard"].primary == "rtsp://10.0.0.6:8554/live"
 
 
 @pytest.mark.parametrize(
@@ -38,7 +46,7 @@ def test_camera_fields_build_the_stream_address() -> None:
 )
 def test_camera_errors(camera: dict[str, object], message: str) -> None:
     with pytest.raises(ConfigError, match=message):
-        parse_config({"cameras": {"door": camera}})
+        parse_config({"cameras": {"door": {"stream_port": 7301, **camera}}})
 
 
 def test_ui_settings() -> None:
@@ -59,8 +67,10 @@ def test_config_file_round_trip(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
     path = tmp_path / "cameras.yaml"
     path.write_text(
         "cameras:\n"
-        "  door:\n    ip: 10.0.0.5\n    password: ${CAM_PASS}\n    brand: hikvision\n"
-        "  yard:\n    source: synthetic://64x48\n    backup: door\n    open_timeout: 2\n"
+        "  door:\n    ip: 10.0.0.5\n    stream_port: 7301\n    password: ${CAM_PASS}\n"
+        "    brand: hikvision\n"
+        "  yard:\n    source: synthetic://64x48\n    stream_port: 7302\n    backup: door\n"
+        "    open_timeout: 2\n"
     )
     file = ConfigFile.open(path)
     assert "secret" in str(file.config().streams["door"].primary)
@@ -76,7 +86,9 @@ def test_config_file_round_trip(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
     assert stat.S_IMODE(os.stat(path).st_mode) == 0o600
 
     removed = ConfigFile.open(path).without_camera("front")
-    assert removed["cameras"] == {"yard": {"source": "synthetic://64x48", "open_timeout": 2}}
+    assert removed["cameras"] == {
+        "yard": {"source": "synthetic://64x48", "stream_port": 7302, "open_timeout": 2}
+    }
 
 
 def test_config_file_rejects_duplicates(tmp_path: Path) -> None:

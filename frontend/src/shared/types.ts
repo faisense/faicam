@@ -15,6 +15,7 @@ export interface Backup {
 /** A camera's form fields. Passwords are never sent, only whether one is set. */
 export interface CameraSettings {
   kind: SourceKind;
+  stream_port: number;
   ip: string;
   port: number;
   username: string | null;

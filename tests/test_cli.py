@@ -16,6 +16,7 @@ def test_settings_change_restarts_in_place(tmp_path: Path) -> None:
     port, ui_port = free_port_block(), free_port_block(1)
     (tmp_path / "cameras.yaml").write_text(
         f"port: {port}\nui:\n  port: {ui_port}\ncameras:\n  cam:\n    source: synthetic://64x48@30\n"
+        f"    stream_port: {port + 1}\n"
     )
     proc = subprocess.Popen(
         [sys.executable, "-m", "faicam"],
